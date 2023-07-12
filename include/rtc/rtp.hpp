@@ -97,16 +97,16 @@ struct RTC_CPP_EXPORT RtcpReportBlock {
 	[[nodiscard]] unsigned int getLossPercentage() const;
 	[[nodiscard]] unsigned int getPacketLostCount() const;
 
-	void preparePacket(SSRC in_ssrc, unsigned int packetsLost, unsigned int totalPackets,
+	void preparePacket(SSRC in_ssrc, unsigned int packetsLost, uint8_t fractionLost,
 	                   uint16_t highestSeqNo, uint16_t seqNoCycles, uint32_t jitter,
 	                   uint64_t lastSR_NTP, uint64_t lastSR_DELAY);
 	void setSSRC(SSRC in_ssrc);
-	void setPacketsLost(unsigned int packetsLost, unsigned int totalPackets);
+	void setPacketsLost(unsigned int packetsLost, uint8_t fraction);
 	void setSeqNo(uint16_t highestSeqNo, uint16_t seqNoCycles);
 	void setJitter(uint32_t jitter);
 	void setNTPOfSR(uint64_t ntp);
 	void setDelaySinceSR(uint32_t sr);
-
+	
 	void log() const;
 };
 

@@ -11,7 +11,7 @@
 #include "rtp.hpp"
 
 #include "impl/internals.hpp"
-
+#include "utils.hpp"
 #include <cmath>
 #include <cstring>
 
@@ -148,14 +148,15 @@ void RtpExtensionHeader::writeCurrentVideoOrientation(size_t offset, const uint8
 
 SSRC RtcpReportBlock::getSSRC() const { return ntohl(_ssrc); }
 
-void RtcpReportBlock::preparePacket(SSRC in_ssrc, [[maybe_unused]] unsigned int packetsLost,
-                                    [[maybe_unused]] unsigned int totalPackets,
+void RtcpReportBlock::preparePacket(SSRC in_ssrc, unsigned int packetsLost,
+                                    uint8_t fraction,
                                     uint16_t highestSeqNo, uint16_t seqNoCycles, uint32_t jitter,
                                     uint64_t lastSR_NTP, uint64_t lastSR_DELAY) {
 	setSeqNo(highestSeqNo, seqNoCycles);
 	setJitter(jitter);
 	setSSRC(in_ssrc);
-
+	setPacketsLost(packetsLost, fraction);
+	
 	// Middle 32 bits of NTP Timestamp
 	// _lastReport = lastSR_NTP >> 16u;
 	setNTPOfSR(uint64_t(lastSR_NTP));
@@ -167,20 +168,22 @@ void RtcpReportBlock::preparePacket(SSRC in_ssrc, [[maybe_unused]] unsigned int 
 
 void RtcpReportBlock::setSSRC(SSRC in_ssrc) { _ssrc = htonl(in_ssrc); }
 
-void RtcpReportBlock::setPacketsLost([[maybe_unused]] unsigned int packetsLost,
-                                     [[maybe_unused]] unsigned int totalPackets) {
-	// TODO Implement loss percentages.
-	_fractionLostAndPacketsLost = 0;
+void RtcpReportBlock::setPacketsLost(unsigned int packetsLost,
+                                     uint8_t fraction) {
+
+	_fractionLostAndPacketsLost = (fraction << 24) + (packetsLost & 0x00FFFFFF);
+	
+	_fractionLostAndPacketsLost = bswap_32(_fractionLostAndPacketsLost);
+	
+	PLOG_DEBUG << "_fractionLostAndPacket:" << _fractionLostAndPacketsLost;
 }
 
 unsigned int RtcpReportBlock::getLossPercentage() const {
-	// TODO Implement loss percentages.
-	return 0;
+	return bswap_32(_fractionLostAndPacketsLost) >> 24;
 }
 
 unsigned int RtcpReportBlock::getPacketLostCount() const {
-	// TODO Implement total packets lost.
-	return 0;
+	return bswap_32(_fractionLostAndPacketsLost) & 0x00FFFFFF;
 }
 
 uint16_t RtcpReportBlock::seqNoCycles() const { return ntohs(_seqNoCycles); }
@@ -211,9 +214,8 @@ void RtcpReportBlock::log() const {
 	PLOG_VERBOSE << "RTCP report block: "
 	             << "ssrc="
 	             << ntohl(_ssrc)
-	             // TODO: Implement these reports
-	             //	<< ", fractionLost=" << fractionLost
-	             //	<< ", packetsLost=" << packetsLost
+	             << ", fractionLost=" << getLossPercentage()
+	             << ", packetsLost=" << getPacketLostCount()
 	             << ", highestSeqNo=" << highestSeqNo() << ", seqNoCycles=" << seqNoCycles()
 	             << ", jitter=" << jitter() << ", lastSR=" << getNTPOfSR()
 	             << ", lastSRDelay=" << delaySinceSR();
